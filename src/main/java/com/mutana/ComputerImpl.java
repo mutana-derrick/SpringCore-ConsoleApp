@@ -1,13 +1,25 @@
 package com.mutana;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.sql.*;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 
 @Component
 public class ComputerImpl implements ComputerInterface {
+
+    private final JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    public ComputerImpl(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
     Scanner scanner = new Scanner(System.in);
 
     @Override
@@ -23,52 +35,35 @@ public class ComputerImpl implements ComputerInterface {
         System.out.print("Record a computer serial number:");
         String serialNumber = scanner.nextLine();
 
+        String sql = "INSERT INTO computers (computer_name, serial_number, date) VALUES (?, ?, ?)";
+        int rowsAffected = jdbcTemplate.update(sql, computerName, serialNumber, java.sql.Date.valueOf(LocalDate.now()));
 
-        try(Connection conn = DBConnection.getConnection()){
-
-            String sql = "INSERT INTO computers (computer_name, serial_number, date) VALUES (?, ?, ?)";
-
-            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                pstmt.setString(1,computerName);
-                pstmt.setString(2, serialNumber);
-                pstmt.setDate(3, java.sql.Date.valueOf(LocalDate.now()));
-
-                pstmt.executeUpdate( );
-
-            }
-
-
-        }catch (SQLException e){
-            e.printStackTrace();
+        if (rowsAffected > 0) {
+            System.out.println("Computer details recorded!\n");
+        } else {
+            System.out.println("Failed to record computer details.");
         }
-        System.out.println("Computer details recorded!\n.");
     }
 
     @Override
     public void viewRecords(){
 
-        try (Connection conn = DBConnection.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet result = stmt.executeQuery("SELECT * FROM computers");){
+        List<Map<String, Object>> computers = jdbcTemplate.queryForList("SELECT * FROM computers");
 
-            if (!result.isBeforeFirst()) {
-                System.out.println("No computers recorded.");
-                return;
-            }
-
-
-            while (result.next()) {
-                System.out.println(
-                        "Name: " + result.getString("computer_name") + "\n" +
-                                "Serial Number: " + result.getString("serial_number") + "\n" +
-                                "Date: " + result.getDate("date") + "\n" +
-                                "------------------"
-                );
-            }
-
-        } catch (SQLException e) {
-            System.out.println("Error retrieving computer records: " + e.getMessage());
-            e.printStackTrace();
+        if (computers.isEmpty()) {
+            System.out.println("No computers recorded.");
+            return;
         }
+
+        for (Map<String, Object> computer : computers) {
+            System.out.println(
+                    "Name: " + computer.get("computer_name") + "\n" +
+                            "Serial Number: " + computer.get("serial_number") + "\n" +
+                            "Date: " + computer.get("date") + "\n" +
+                            "------------------"
+            );
+        }
+
     }
 }
+
